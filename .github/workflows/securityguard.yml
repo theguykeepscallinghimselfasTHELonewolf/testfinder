@@ -3,7 +3,11 @@ name: Security Agent Workflow
 on:
   push:
     branches: ["main"]
+    paths:
+      - '**/coverity.yaml'
   pull_request:
+    paths:
+      - '**/coverity.yaml'
 
 jobs:
   security-assessment:

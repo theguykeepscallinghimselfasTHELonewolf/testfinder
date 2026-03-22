@@ -1,9 +1,10 @@
 import os
 import re
 import json
+import hashlib
 from pathlib import Path
 
-# Stage 1: Deterministic Safe Paths (Folders and Files we don't need an AST/LLM to verify)
+# Stage 1: Deterministic Safe Paths
 SAFE_INFRA_DIRS = {
     'node_modules', 'venv', '.venv', '__pycache__', '.git', 
     'build', 'dist', 'target', 'bin', 'obj', 'out', '.idea', '.vscode'
@@ -12,8 +13,33 @@ SAFE_INFRA_DIRS = {
 SAFE_CONFIG_FILES = {
     '.gitignore', 'uv.lock', 'package-lock.json', 'yarn.lock', 
     'poetry.lock', 'pom.xml', 'build.gradle', 'dockerfile', 'docker-compose.yml',
-    'coverity.yaml', 'tox.ini', 'pytest.ini'
+    'coverity.yaml', 'tox.ini', 'pytest.ini', '.testfinder-exemptions.lock'
 }
+
+LOCKFILE_NAME = ".testfinder-exemptions.lock"
+
+def calculate_file_hash(filepath: Path) -> str:
+    """Calculates the SHA-256 hash of a file."""
+    sha256_hash = hashlib.sha256()
+    try:
+        with open(filepath, "rb") as f:
+            # Read in 4K chunks to handle large files efficiently
+            for byte_block in iter(lambda: f.read(4096), b""):
+                sha256_hash.update(byte_block)
+        return sha256_hash.hexdigest()
+    except Exception:
+        return ""
+
+def load_exemption_lockfile(project_root: Path) -> dict:
+    """Loads the cryptographic lockfile if it exists."""
+    lockfile_path = project_root / LOCKFILE_NAME
+    if lockfile_path.exists():
+        try:
+            with open(lockfile_path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except json.JSONDecodeError:
+            print(f"⚠️ Warning: {LOCKFILE_NAME} is corrupted. Ignoring cache.")
+    return {}
 
 def validate_regex_exclusions(project_root: str, regex_string: str, analyzer) -> dict:
     """
@@ -28,10 +54,14 @@ def validate_regex_exclusions(project_root: str, regex_string: str, analyzer) ->
         print(f"❌ Invalid Regex Provided: {e}")
         return {}
 
+    # Load the cryptographic cache
+    lock_data = load_exemption_lockfile(root_path)
+
     report = {
         "valid_infrastructure": [],
         "valid_tests_ast": [],
-        "suspicious_files": []
+        "valid_cached_exemptions": [], # NEW: Stage 3 (The Lockfile Cache)
+        "suspicious_files": []         # Stage 4 (The LLM Escalation)
     }
 
     print(f"\n🔬 Scanning repository against regex: {regex_string}")
@@ -39,6 +69,17 @@ def validate_regex_exclusions(project_root: str, regex_string: str, analyzer) ->
     for dirpath, dirnames, filenames in os.walk(root_path):
         # Normalize path separators for regex matching (Coverity uses forward slashes)
         current_dir = Path(dirpath)
+        
+        # O(1) PERFORMANCE FIX: Prune heavy infra folders entirely
+        pruned_dirs = []
+        for d in dirnames:
+            if d in SAFE_INFRA_DIRS:
+                d_rel = str((current_dir / d).relative_to(root_path)).replace("\\", "/")
+                if exclusion_pattern.search(d_rel + "/"):
+                    report["valid_infrastructure"].append(d_rel + "/")
+            else:
+                pruned_dirs.append(d)
+        dirnames[:] = pruned_dirs 
         
         for filename in filenames:
             file_path = current_dir / filename
@@ -67,8 +108,20 @@ def validate_regex_exclusions(project_root: str, regex_string: str, analyzer) ->
                     })
                     continue
                 
-                # --- STAGE 3: The Delta (Suspicious) ---
-                # If it's not standard infra, and AST didn't find test functions... why is it excluded?
+                # --- STAGE 3: Cryptographic Cache Check (The Lockfile) ---
+                file_hash = calculate_file_hash(file_path)
+                cached_entry = lock_data.get(rel_path)
+                
+                # Verify the path exists in the cache, the hashes match perfectly, and it was marked VALID
+                if cached_entry and cached_entry.get("hash") == file_hash and cached_entry.get("verdict") == "VALID":
+                    report["valid_cached_exemptions"].append({
+                        "file": rel_path,
+                        "reason": cached_entry.get("reason", "No reason provided")
+                    })
+                    continue
+
+                # --- STAGE 4: The Delta (Suspicious) ---
+                # Hash mismatch, new file, or previously invalid. Escalate to LLM.
                 report["suspicious_files"].append(rel_path)
 
     return report
@@ -80,14 +133,21 @@ def print_validation_report(report: dict, export_json: bool = True):
 
     infra_count = len(report["valid_infrastructure"])
     test_count = len(report["valid_tests_ast"])
+    cache_count = len(report["valid_cached_exemptions"])
     suspicious_count = len(report["suspicious_files"])
 
     print("\n🛡️  Regex Validation Report")
     print("=" * 60)
     print(f"✅ Valid Infrastructure/Config Files : {infra_count}")
     print(f"✅ Valid Test Files (Verified by AST): {test_count}")
+    print(f"✅ Valid Cached Exemptions (Lockfile): {cache_count}")
     print(f"⚠️  Suspicious Files (Requires Review): {suspicious_count}")
     print("=" * 60)
+
+    if cache_count > 0:
+        print("\n🔒 CACHED EXEMPTIONS APPLIED:")
+        for entry in report["valid_cached_exemptions"]:
+            print(f"  [✓] {entry['file']} (Reason: {entry['reason']})")
 
     if suspicious_count > 0:
         print("\n🚨 SUSPICIOUS FILES DETECTED:")
