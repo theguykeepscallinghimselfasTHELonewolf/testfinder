@@ -6,7 +6,6 @@ from path_finder import detect_project_root
 from analyzer import TestAnalyzer
 from utils.validator import validate_regex_exclusions, print_validation_report
 
-# ... (Replace the hardcoded function) ...
 def print_supported_languages(analyzer: TestAnalyzer):
     """Prints a dynamic table based on currently installed SCM queries."""
     capabilities = analyzer.get_supported_capabilities()
