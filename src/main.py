@@ -45,7 +45,7 @@ def main():
     parser.add_argument("--supported", action="store_true", help="List supported languages and testing frameworks")
     parser.add_argument("--validate", type=str, help="Validate an existing Coverity regex against the target path")
     args = parser.parse_args()
-
+    analyzer = TestAnalyzer(queries_dir=args.queries)
     if args.supported:
         print_supported_languages(analyzer)
         sys.exit(0)
@@ -70,7 +70,7 @@ def main():
             project_root = str(target_path) if target_path.is_dir() else str(target_path.parent)
     else:
         project_root = str(Path.cwd())
-    analyzer = TestAnalyzer(queries_dir=args.queries)
+    
     
     if args.validate:
         if not args.target_path:
