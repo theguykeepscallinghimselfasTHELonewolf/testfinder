@@ -1,5 +1,5 @@
 File/Folder Path,Exclusion Status,Test Hits,Frameworks,Initial Triggers,User Comments
-TEST_REPOS/django-testing-examples/myapp/tests/selenium_tests/conftest.py,Auto-Detected Excluded,2,Pytest,Uses testing-specific decorator (@pytest / @fixture),
+TEST_REPOS/django-testing-examples/myapp/tests/selenium_tests/conftest.py,False Positive (Skipped),2,Pytest,Uses testing-specific decorator (@pytest / @fixture),Testing Removal of Test Case File
 TEST_REPOS/django-testing-examples/myapp/tests/selenium_tests/test_selenium.py,Auto-Detected Excluded,1,Pytest/Unittest,Contains test function (test_*),
 TEST_REPOS/django-testing-examples/myapp/tests/test_forms.py,Auto-Detected Excluded,2,Pytest/Unittest,Contains test function (test_*),
 TEST_REPOS/django-testing-examples/myapp/tests/test_helloworld.py,Auto-Detected Excluded,1,Pytest/Unittest,Contains test function (test_*),
@@ -33,3 +33,4 @@ TEST_REPOS/neotest-dotnet/tests/xunit/specs/classdata.cs,Auto-Detected Excluded,
 TEST_REPOS/neotest-dotnet/tests/xunit/specs/fact_and_trait.cs,Auto-Detected Excluded,1,xUnit,xUnit framework detected ([Fact] / [Theory]),
 TEST_REPOS/neotest-dotnet/tests/xunit/specs/nested_class.cs,Auto-Detected Excluded,3,xUnit,xUnit framework detected ([Fact] / [Theory]),
 TEST_REPOS/neotest-dotnet/tests/xunit/specs/theory_and_fact_mixed.cs,Auto-Detected Excluded,2,xUnit,xUnit framework detected ([Fact] / [Theory]),
+src,Manually Excluded,N/A,N/A,Manual Selection,Actual Source Code

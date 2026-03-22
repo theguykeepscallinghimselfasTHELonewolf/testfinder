@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 from path_finder import detect_project_root
 from analyzer import TestAnalyzer
-
+from utils.validator import validate_regex_exclusions, print_validation_report
 
 # ... (Replace the hardcoded function) ...
 def print_supported_languages(analyzer: TestAnalyzer):
@@ -33,9 +33,7 @@ def print_supported_languages(analyzer: TestAnalyzer):
         
     print("=" * 105 + "\n")
 
-#
-    
-# ... (Rest of main.py remains exactly the same) ...
+
 
 def main():
     parser = argparse.ArgumentParser(description="TestFinder: Detect test files intelligently.")
@@ -45,15 +43,17 @@ def main():
     parser.add_argument("--source", help="Code snippet to analyze")
     parser.add_argument("--language", help="Language of the code snippet")
     parser.add_argument("--supported", action="store_true", help="List supported languages and testing frameworks")
-    
+    parser.add_argument("--validate", type=str, help="Validate an existing Coverity regex against the target path")
     args = parser.parse_args()
 
+    if args.supported:
+        print_supported_languages(analyzer)
+        sys.exit(0)
 
 
     # Modified check to allow running just --supported without a target_path
     if not args.target_path and not args.source:
-        if not args.supported:
-            parser.error("Either target_path or --source must be provided. Use --help for usage.")
+        parser.error("Either target_path or --source must be provided. Use --help for usage.")
 
     if args.source and not args.language:
         parser.error("--language is required when using --source.")
@@ -70,8 +70,20 @@ def main():
             project_root = str(target_path) if target_path.is_dir() else str(target_path.parent)
     else:
         project_root = str(Path.cwd())
-
     analyzer = TestAnalyzer(queries_dir=args.queries)
+    
+    if args.validate:
+        if not args.target_path:
+            parser.error("--validate requires a target_path to scan against.")
+        
+        report = validate_regex_exclusions(project_root, args.validate, analyzer)
+        print_validation_report(report)
+        
+        # CI/CD Standard: Exit with code 1 if suspicious files are found so the pipeline halts
+        if len(report.get("suspicious_files", [])) > 0:
+            sys.exit(1)
+        sys.exit(0)
+   
 
 
 
@@ -147,23 +159,30 @@ def main():
             print(row_format.format(file_val, lang_val, hits_val, fw_val, trig_val))
         
         print("=" * 110 + "\n")
-# --- NEW: Trigger the TUI Workflow ---
+# --- Trigger the TUI & Regex Workflow ---
         if findings:
             proceed = input("Do you want to review these files and build an exclusion list? (y/N): ")
             if proceed.strip().lower() == 'y':
                 from utils.tui_selector import ExclusionTUI, generate_csv_report
+                from utils.yaml_generator import generate_all_yamls  # <-- UPDATED IMPORT
                 
                 # Run the interactive TUI
                 app = ExclusionTUI(findings, project_root)
                 tui_result = app.run()
                 
                 if tui_result:
+                    # 1. Generate the CSV and JSON reports
                     generate_csv_report(tui_result)
                     
-                    print("\n🎯 Files confirmed for regex exclusion:")
-                    for f in tui_result["selected_for_exclusion"]:
-                        print(f"  - {f}")
-                    # Here is where you will eventually pass the files to your Regex Generator!
+                    # 2. Generate Coverity YAMLs based on monorepo structure
+                    final_paths = tui_result.get("selected_for_exclusion", [])
+                    # NEW: Grab the false positives from the TUI
+                    false_positives = list(tui_result.get("false_positives", {}).keys()) 
+                    
+                    if final_paths:
+                        generate_all_yamls(final_paths, false_positives) # NEW: Pass them in!
+                    else:
+                        print("\n⚠️ No files were selected for exclusion. Skipping YAML generation.")
                 else:
                     print("\nAborted exclusion list builder.")
 
