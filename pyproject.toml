@@ -1,0 +1,13 @@
+[project]
+name = "testfinder"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "textual>=8.1.1",
+    "tree-sitter>=0.25.2",
+    "tree-sitter-c-sharp>=0.23.1",
+    "tree-sitter-java>=0.23.5",
+    "tree-sitter-python>=0.25.0",
+]
