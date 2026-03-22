@@ -1,6 +1,7 @@
 {
   "valid_infrastructure": [],
   "valid_tests_ast": [],
+  "valid_cached_exemptions": [],
   "suspicious_files": [
     "src/path_finder.py",
     "src/.DS_Store",
