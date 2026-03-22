@@ -8,3 +8,6 @@ wheels/
 
 # Virtual environments
 .venv
+
+# TEST DATA
+TEST_REPOS
