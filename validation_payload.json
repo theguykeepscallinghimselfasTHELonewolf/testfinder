@@ -1,0 +1,11 @@
+{
+  "valid_infrastructure": [],
+  "valid_tests_ast": [],
+  "suspicious_files": [
+    "src/path_finder.py",
+    "src/.DS_Store",
+    "src/analyzer.py",
+    "src/language_detector.py",
+    "src/main.py"
+  ]
+}

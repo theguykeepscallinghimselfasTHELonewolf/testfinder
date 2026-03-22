@@ -2,7 +2,7 @@
 capture:
   # Source capture exclusions (Interpreted languages like Python/JS)
   files:
-    exclude_regex: "^(?:node_modules/.*|venv/.*|tests/backend/.*)$"
+    exclude_regex: "^(?:src/[^/]+)$"
   
   # Build capture exclusions (Compiled languages like Java/C#/Go)
   compiler_configuration:
