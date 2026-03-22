@@ -1,0 +1,3 @@
+capture:
+  files:
+    exclude_regex: '^(?:myapp/tests/[^/]+|myapp/tests/selenium_tests/conftest\.py|myapp/tests/selenium_tests/test_selenium\.py)$'

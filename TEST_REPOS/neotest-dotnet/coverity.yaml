@@ -1,0 +1,4 @@
+capture:
+  compiler_configuration:
+    cov_configure_args:
+      - '--xml-option=skip_file:^(?:tests/xunit/specs/[^/]+|tests/nunit/specs/[^/]+)$'

@@ -1,0 +1,156 @@
+name: Security Agent Workflow
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+
+jobs:
+  security-assessment:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # FIX: Required for tj-actions/changed-files to work!
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install GitHub Copilot CLI
+        run: npm i -g @github/copilot
+        
+      - name: Setup Python environment
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5 # Note: v5 is the current stable major version
+        
+      - name: Install Dependencies
+        run: |
+            uv install
+          # Install your CLI tool dependencies here
+
+      - name: Get changed coverity.yaml files
+        id: changed-files
+        uses: tj-actions/changed-files@v42
+        with:
+          files: |
+            **/coverity.yaml
+
+      - name: Stage 1 & 2 - AST Heuristic Validation
+        id: ast-validation
+        run: |
+          for file in ${{ steps.changed-files.outputs.all_changed_files }}; do
+            echo "Scanning exclusions in $file..."
+            
+            # Extract the regex using Python/YQ (Assuming a simple Python inline script here)
+            REGEX=$(uv run python -c "import yaml; print(yaml.safe_load(open('$file'))['capture']['files']['exclude_regex'])" 2>/dev/null || echo "")
+            
+            if [ -n "$REGEX" ]; then
+              uv run python src/main.py $(dirname "$file") --validate "$REGEX"
+            fi
+          done
+        # If main.py exits with 1 (Suspicious files found), this step fails.
+        # We use continue-on-error so we can trigger the LLM step next.
+        continue-on-error: true
+
+      - name: Run Security Agent via Copilot CLI
+        env:
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          # 1. Setup reporting directory
+          mkdir -p security-reports
+          REPORT_PATH="security-reports/security-assessment-report.md"
+          echo "# 🛡️ Security Assessment Report" > "$REPORT_PATH"
+
+          # 2. Check if the AST step found anything suspicious
+          if [ ! -f "validation_payload.json" ]; then
+            echo "No validation payload found. All AST checks passed!"
+            echo "No suspicious files detected by the AST engine." >> "$REPORT_PATH"
+            exit 0
+          fi
+
+          # 3. Use jq to parse the JSON array of suspicious files
+          SUSPICIOUS_FILES=$(jq -r '.suspicious_files[]' validation_payload.json)
+
+          if [ -z "$SUSPICIOUS_FILES" ]; then
+            echo "No suspicious files to process."
+            exit 0
+          fi
+
+          # 4. Loop through each file, truncate content, and ask Copilot
+          AGENT_PROMPT=$(cat .github/agents/security-reporter.agent.md || echo "You are an expert Security Architect.")
+
+          for FILE_PATH in $SUSPICIOUS_FILES; do
+            echo "Evaluating $FILE_PATH with Copilot..."
+            
+            # FIX: Bash equivalent of [:3000]. Grabs first 3000 bytes.
+            CODE_CONTENT=$(head -c 3000 "$FILE_PATH" 2>/dev/null || echo "Could not read file.")
+
+            PROMPT="$AGENT_PROMPT
+            
+            Context:
+            - Repository: $GITHUB_REPOSITORY
+
+            You are an expert Security Architect evaluating a SAST exclusion request.
+            A developer is attempting to exclude the following file from static analysis (Coverity).
+
+            File Path: $FILE_PATH
+
+            Analyze the code. Is this a legitimate test file, mock, fixture, or configuration that does not require security scanning? Or is it production business logic that MUST be scanned?
+
+            Respond ONLY with a JSON object in this exact format:
+            {\"verdict\": \"VALID\" or \"INVALID\", \"reason\": \"A 1-sentence explanation why.\"}
+
+            If it is INVALID, you MUST include the exact phrase 'THIS ASSESSMENT CONTAINS A CRITICAL VULNERABILITY' somewhere in your response.
+
+            Code:
+            \`\`\`
+            $CODE_CONTENT
+            \`\`\`"
+
+            # Execute Copilot and append output directly to the report
+            echo "### Assessment for \`$FILE_PATH\`" >> "$REPORT_PATH"
+            copilot --prompt "$PROMPT" --allow-all-tools --allow-all-paths < /dev/null >> "$REPORT_PATH"
+            echo -e "\n---\n" >> "$REPORT_PATH"
+          done
+
+      - name: Upload security report artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-assessment-report-${{ github.run_id }}
+          path: security-reports/security-assessment-report.md
+          retention-days: 3
+
+      # 4. The Logic Check (The "Smart Fail")
+      - name: Check for critical vulnerabilities
+        if: always()
+        run: |
+          set -euo pipefail
+          REPORT_PATH="security-reports/security-assessment-report.md"
+
+          if [ ! -f "$REPORT_PATH" ]; then
+            echo "No report found."
+            exit 0 # Exiting 0 so we don't break the build if the pipeline just didn't run the agent
+          fi
+
+          if grep -q "THIS ASSESSMENT CONTAINS A CRITICAL VULNERABILITY" "$REPORT_PATH"; then
+            echo "❌ CRITICAL VULNERABILITY DETECTED - Workflow failed"
+            echo "The security assessment found critical vulnerabilities that must be addressed."
+            exit 1 # This breaks the build!
+          else
+            echo "✅ No critical vulnerabilities detected"
+          fi

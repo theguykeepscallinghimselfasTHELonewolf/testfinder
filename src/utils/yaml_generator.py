@@ -1,4 +1,4 @@
-import json
+import json, os
 import re
 from pathlib import Path
 from collections import defaultdict
@@ -118,6 +118,55 @@ def optimize_to_regex(paths: list[str], fps: list[str]) -> str:
     combined_regex = "|".join(optimized_patterns)
     return f"^(?:{combined_regex})$"
 
+
+def process_project_yaml(project: str, data: dict, base_dir: str, write_to_disk: bool):
+    compiled_regex = optimize_to_regex(data["compiled"], data["compiled_fps"])
+    interpreted_regex = optimize_to_regex(data["interpreted"], data["interpreted_fps"])
+    
+    # Determine the file path
+    if project == "root":
+        target_dir = Path(base_dir)
+    else:
+        target_dir = Path(base_dir) / project
+
+    yaml_location = target_dir / "coverity.yaml"
+    
+    print(f"\n📦 Project: [ {project.upper()} ]")
+    print("-" * 60)
+    
+    # Build the YAML string
+    yaml_output = ["capture:"]
+    if interpreted_regex: yaml_output.extend(["  files:", f"    exclude_regex: '{interpreted_regex}'"])
+    if compiled_regex: yaml_output.extend(["  compiler_configuration:", "    cov_configure_args:", f"      - '--xml-option=skip_file:{compiled_regex}'"])
+    
+    yaml_string = "\n".join(yaml_output) + "\n"
+    print(yaml_string)
+    
+    # Write to disk if requested
+    if write_to_disk:
+        os.makedirs(target_dir, exist_ok=True)
+        # Check if file exists to warn about overwriting
+        prefix = "⚠️ Overwrote existing" if yaml_location.exists() else "✅ Created new"
+        
+        with open(yaml_location, 'w', encoding='utf-8') as f:
+            f.write(yaml_string)
+            
+        print(f"{prefix} file: {yaml_location}")
+    else:
+        print(f"📄 Suggested Path: {yaml_location}")
+
+    print("-" * 60)
+
+def generate_all_yamls(excluded_paths: list[str], false_positives: list[str], base_dir: str, write_to_disk: bool = False):
+    print("\n🛡️  Coverity YAML Monorepo Generator")
+    print("=" * 60)
+    for project, data in categorize_by_project_and_type(excluded_paths, false_positives).items():
+        if data["compiled"] or data["interpreted"]: 
+            process_project_yaml(project, data, base_dir, write_to_disk)
+
+
+
+
 def print_project_yaml(project: str, data: dict):
     """Outputs the scoped coverity.yaml configuration for a specific project."""
     compiled_regex = optimize_to_regex(data["compiled"], data["compiled_fps"])
@@ -143,16 +192,16 @@ def print_project_yaml(project: str, data: dict):
     print("\n".join(yaml_output))
     print("-" * 60)
 
-def generate_all_yamls(excluded_paths: list[str], false_positives: list[str]):
-    print("\n🛡️  Coverity YAML Monorepo Generator")
-    print("=" * 60)
+# def generate_all_yamls(excluded_paths: list[str], false_positives: list[str]):
+#     print("\n🛡️  Coverity YAML Monorepo Generator")
+#     print("=" * 60)
     
-    projects_data = categorize_by_project_and_type(excluded_paths, false_positives)
+#     projects_data = categorize_by_project_and_type(excluded_paths, false_positives)
     
-    for project, data in projects_data.items():
-        if not data["compiled"] and not data["interpreted"]:
-            continue
-        print_project_yaml(project, data)
+#     for project, data in projects_data.items():
+#         if not data["compiled"] and not data["interpreted"]:
+#             continue
+#         print_project_yaml(project, data)
 
 if __name__ == "__main__":
     import sys

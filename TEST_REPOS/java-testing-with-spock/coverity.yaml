@@ -1,0 +1,4 @@
+capture:
+  compiler_configuration:
+    cov_configure_args:
+      - '--xml-option=skip_file:^(?:chapter1/src/test/java/com/manning/spock/chapter1/[^/]+|chapter2/src/test/java/com/manning/spock/chapter2/NormalAssert\.java|chapter2/src/test/java/com/manning/spock/chapter2/ObjectCreationTest\.java|chapter3/src/test/java/com/manning/spock/chapter3/nuclear/NuclearReactorTest\.java|chapter3/src/test/java/com/manning/spock/chapter3/coolant/CoolantSensorTest\.java|chapter3/src/test/java/com/manning/spock/chapter3/fire/FireSensor2Test\.java|chapter3/src/test/java/com/manning/spock/chapter3/fire/FireSensorTest\.java)$'

@@ -1,0 +1,4 @@
+capture:
+  compiler_configuration:
+    cov_configure_args:
+      - '--xml-option=skip_file:^(?:selenium/src/test/java/example/GoogleTest\.java|selenium/src/test/java/tictactoe/TicTacToeTest\.java|selenium/src/test/java/todo/[^/]+|bank\-ocr/src/test/java/bank/RunCukesTest\.java|example/src/test/java/example/FeedsWalrusTest\.java|example/src/test/java/example/OpensCanTest\.java|example/src/test/java/example/values/WalrusTest\.java|example\-cucumber/src/test/java/example/RunCukesTest\.java|example\-cucumber/src/test/java/example/Stepdefs\.java)$'

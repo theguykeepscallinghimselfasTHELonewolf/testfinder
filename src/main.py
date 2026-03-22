@@ -178,12 +178,14 @@ def main():
                     # NEW: Grab the false positives from the TUI
                     false_positives = list(tui_result.get("false_positives", {}).keys()) 
                     
-                    if final_paths:
-                        generate_all_yamls(final_paths, false_positives) # NEW: Pass them in!
-                    else:
-                        print("\n⚠️ No files were selected for exclusion. Skipping YAML generation.")
+                if final_paths:
+                    # NEW: Ask the user if they want to physically write the files
+                    write_prompt = input("\nDo you want to automatically create/update the coverity.yaml files on disk? (y/N): ")
+                    write_to_disk = write_prompt.strip().lower() == 'y'
+                    
+                    # Pass the root directory and the user's choice to the generator
+                    generate_all_yamls(final_paths, false_positives, base_dir=project_root, write_to_disk=write_to_disk)
                 else:
-                    print("\nAborted exclusion list builder.")
-
+                    print("\n⚠️ No files were selected for exclusion. Skipping YAML generation.")
 if __name__ == "__main__":
     main()

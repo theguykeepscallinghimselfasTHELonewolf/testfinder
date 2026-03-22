@@ -1,0 +1,32 @@
+language: python
+sudo: true
+python:
+  - "3.5"
+  - "3.6"
+
+addons:
+  firefox: "latest"
+
+env:
+  - DJANGO_VERSION=1.11
+  - DJANGO_VERSION=2.0
+
+# Omit this if you do not use selenium
+before_install:
+  - wget https://github.com/mozilla/geckodriver/releases/download/v0.21.0/geckodriver-v0.21.0-linux64.tar.gz
+  - mkdir geckodriver
+  - tar -xzf geckodriver-v0.21.0-linux64.tar.gz -C geckodriver
+  - export PATH=$PATH:$PWD/geckodriver
+
+
+install:
+  - pip install -I Django==$DJANGO_VERSION
+  - pip install -r testing-requirements.txt
+
+before_script:
+script:
+  - PYTHONWARNINGS=all pytest --cov=.
+  - python -Wall manage.py test
+
+after_success:
+  - codecov

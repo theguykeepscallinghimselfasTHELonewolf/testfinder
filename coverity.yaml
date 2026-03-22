@@ -1,0 +1,10 @@
+# coverity.yaml (SAFE)
+capture:
+  # Source capture exclusions (Interpreted languages like Python/JS)
+  files:
+    exclude_regex: "^(?:node_modules/.*|venv/.*|tests/backend/.*)$"
+  
+  # Build capture exclusions (Compiled languages like Java/C#/Go)
+  compiler_configuration:
+    cov_configure_args: 
+      - "--xml-option=skip_file:^(?:tests/UnitTests/.*)$"
