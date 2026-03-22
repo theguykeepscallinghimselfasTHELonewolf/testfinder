@@ -22,9 +22,7 @@ jobs:
         with:
           node-version: 22
 
-      - name: Install GitHub Copilot CLI
-        run: npm i -g @github/copilot
-        
+
       - name: Setup Python environment
         uses: actions/setup-python@v5
         with:
@@ -36,7 +34,7 @@ jobs:
         
       - name: Install Dependencies
         run: |
-            uv install
+            uv sync
           # Install your CLI tool dependencies here
 
       - name: Get changed coverity.yaml files
@@ -62,7 +60,9 @@ jobs:
         # If main.py exits with 1 (Suspicious files found), this step fails.
         # We use continue-on-error so we can trigger the LLM step next.
         continue-on-error: true
-
+      - name: Install GitHub Copilot CLI
+        run: npm i -g @github/copilot
+        
       - name: Run Security Agent via Copilot CLI
         env:
           COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
